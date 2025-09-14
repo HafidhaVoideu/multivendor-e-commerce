@@ -1,20 +1,31 @@
 import { inngest } from "./client";
 import prisma from "@/lib/prisma";
+
+console.log("the file is loaded");
+
 export const syncUserCreation = inngest.createFunction(
   { id: "sync-user-create" },
   { event: "clerk/user.created" },
   async ({ event }) => {
-    const { data } = event;
-    await prisma.user.create({
-      data: {
-        id: data.id,
-        email: data.email_addresses[0],
-        name: `${data.first_name} ${data.last_name}`,
-        image: data.image_url,
-      },
-    });
+    console.log("Received user.created event:", event.data);
 
-    return;
+    const data = event.data;
+
+    try {
+      await prisma.user.upsert({
+        where: { id: data.id },
+        update: {}, // do nothing if exists
+        create: {
+          id: data.id,
+          email: data.email_addresses[0]?.emailAddress ?? "",
+          name: `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim(),
+          image: data.image_url ?? "",
+        },
+      });
+      console.log("User inserted into Neon:", data.id);
+    } catch (err) {
+      console.error("Failed to insert user into Neon:", err);
+    }
   }
 );
 

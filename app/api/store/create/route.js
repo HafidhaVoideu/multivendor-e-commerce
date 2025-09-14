@@ -1,11 +1,15 @@
-import { getAuth } from "@clerk/nextjs/dist/types/server";
-import { NextRequest, NextResponse } from "next/server";
-import imagekit from "./../../../../../configs/imageKit";
-import prisma from "./../../../../../lib/prisma";
+import { getAuth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+
+import imagekit from "@/configs/imageKit";
+
+import prisma from "@/lib/prisma";
 
 export async function POST(request) {
   try {
     const { userId } = getAuth(request);
+
+    console.log("userid in router:", userId);
     const formData = await request.formData();
     const username = formData.get("username");
     const email = formData.get("email");
@@ -24,8 +28,8 @@ export async function POST(request) {
       !description ||
       !image
     ) {
-      return NextRequest.json(
-        { error: "All fields are required" },
+      return NextResponse.json(
+        { success: false, error: "All fields are required" },
         { status: 400 }
       );
     }
@@ -35,23 +39,23 @@ export async function POST(request) {
     });
 
     if (store) {
-      return NextRequest.json({ status: store.status });
+      return NextResponse.json({ success: true, status: store.status });
     }
 
     const isUsernameTaken = await prisma.store.findFirst({
-      where: { username: username.toLoawerCase() },
+      where: { username: username.toLowerCase() },
     });
 
     if (isUsernameTaken) {
-      return NextRequest.json(
-        { error: "Username is already taken" },
+      return NextResponse.json(
+        { success: false, error: "Username is already taken" },
         { status: 400 }
       );
     }
 
-    const buffer = Buffer.fron(await image.arrayBuffer());
+    const buffer = Buffer.from(await image.arrayBuffer());
 
-    const logoURLResponse = imagekit.upload({
+    const logoURLResponse = await imagekit.upload({
       file: buffer,
       fileName: image.name,
       folder: "logos",
@@ -69,33 +73,33 @@ export async function POST(request) {
     });
 
     const createStore = await prisma.store.create({
-      where: { userId: userId },
       data: {
-        username: username.toLoawerCase,
+        userId,
+        username: username.toLowerCase(),
         email: email,
         name: name,
         contact: contact,
         address: address,
         description: description,
-        image: optimizedImage,
+        logo: optimizedImage,
       },
 
       // connect user to a store
     });
 
     await prisma.user.update({
-      where: { userId: userId },
+      where: { userId },
       data: { store: { connect: { id: createStore.id } } },
     });
 
-    return NextRequest.json({
-      message: "Store created successfully.Waiting for approval...",
+    return NextResponse.json({
+      message: "Store created successfully! Wait for admin approval.",
     });
   } catch (error) {
-    console.log("error in create store");
+    console.log("error in create store", error);
 
     return NextResponse.json(
-      { error: error.code || error.message },
+      { success: false, error: error.code || error.message },
       { status: 400 }
     );
   }
@@ -108,18 +112,18 @@ export async function GET(request) {
 
   try {
     const store = await prisma.store.findFirst({
-      where: { userId: userId },
+      where: { userId },
     });
 
     if (store) {
-      return NextRequest.json({ status: store.status });
+      return NextResponse.json({ success: true, status: store.status });
     }
 
-    return NextRequest.json({ status: "not registered" });
+    return NextResponse.json({ status: "not registered" });
   } catch (error) {
     console.log("error in get store status");
     return NextResponse.json(
-      { error: error.code || error.message },
+      { success: false, error: error.code || error.message },
       { status: 400 }
     );
   }

@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { authSeller } from "@/middleware/authSeller";
-import { getAuth } from "@clerk/nextjs/dist/types/server";
+import { getAuth } from "@clerk/nextjs/server";
 
 export async function POST(request) {
   try {
